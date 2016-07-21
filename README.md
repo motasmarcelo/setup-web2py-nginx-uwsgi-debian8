@@ -8,6 +8,7 @@ README
 
 - **CREDITS:** Adapted from web2py's scripts/setup-web2py-nginx-uwsgi-ubuntu.sh
 
+*Available at git@github.com:motasmarcelo/setup-web2py-nginx-uwsgi-debian8.git*
 
 ####Scritps
 
@@ -36,7 +37,7 @@ README
  2016/07/10:
 
 - using uwsgi package provided by Debian repo;
-- new web2py's folder skeleton broke uwsgi's app config --> fixed (a simple link got it)
+- new web2py's folders skeleton broke uwsgi's app config --> fixed (a simple link got it)
 - improve SSL/TLS private key (x509 certificate) to 2048 bits
 - setting x509v3 extensions in temporary file
 
@@ -45,3 +46,4 @@ README
 - review nginx conf for better settings  
 - improve x509v3 extensions config
 - improve uwsgi to work on emperor mode (maybe building service [emperor.uwsgi.service](http://uwsgi-docs.readthedocs.io/en/latest/Systemd.html) at deploy )
+- converge two scripts into single one;

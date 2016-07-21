@@ -1,12 +1,23 @@
 #!/bin/bash
+
+
+LOG_FILE=/tmp/setup-web2py.log
+
+logged () {
+    echo $(date +"%F_%T") $*  | tee -a $LOG_FILE
+}
+
 echo 'Setup-web2py-nginx-uwsgi-debian8.sh'
 echo 'Requires Debian 8 (Jessie) and installs Nginx + uWSGI + Web2py'
+
 # Check if user has root privileges
 if [[ $EUID -ne 0 ]]; then
-   echo "You must run the script as root or using sudo"
-   exit 1
+    logged "Aborting..."
+    logged "You must run the script as root or using sudo"
+    exit 1
 fi
 
+logged "Starting SETUP on $(date)"
 
 # Get Web2py Application Name
 echo -e "Web2py Application Name: \c "
@@ -22,6 +33,8 @@ echo
 echo -e "Web2py Admin Password: \c "
 read  PW
 
+
+logged "[+]Updating system and installing needed software"
 # Upgrade and install needed software
 apt-get update
 apt-get -y upgrade
@@ -35,8 +48,8 @@ apt-get -y install build-essential sudo python-dev libxml2-dev unzip
 echo
 
 
+logged "[+]Configuring nginx's $APPNAME config at /etc/nginx/conf.d/$APPNAME"
 # Create common nginx sections
-echo "Configuring nginx's $APPNAME config at /etc/nginx/conf.d/$APPNAME"
 mkdir /etc/nginx/conf.d/"$APPNAME"
 echo '
 gzip_static on;
@@ -132,11 +145,14 @@ server {
 
 }" >/etc/nginx/sites-available/"$APPNAME"
 
+#Link to sites-enabled (up)
 ln -s /etc/nginx/sites-available/"$APPNAME" /etc/nginx/sites-enabled/"$APPNAME"
 rm /etc/nginx/sites-enabled/default
+
+logged "[+]Building SSL/TLS stuff"
+#### Work on SSL stuff
 mkdir /etc/nginx/ssl
 cd /etc/nginx/ssl
-
 # Create a temporary openssl conf
 echo "
 [ req ]
@@ -169,15 +185,16 @@ subjectKeyIdentifier=hash
 authorityKeyIdentifier=keyid,issuer
 " > /tmp/openssl.cnf
 
-echo 'Creating a x509 certificate (2048 bits key-length and valid for 365 days) to run HTTPS'
+logged '[+]Creating a x509 certificate (2048 bits key-length and valid for 365 days) to run HTTPS'
 openssl genrsa -out "$APPNAME".key 2048
 chmod 400 "$APPNAME".key
 openssl req -new -x509 -sha256 -days 365 -key "$APPNAME".key -config /tmp/openssl.cnf -extensions usr_cert -out "$APPNAME".crt
 openssl x509 -noout -fingerprint -text -in "$APPNAME".crt > "$APPNAME".info
 rm -rf /tmp/certificate.txt
 
-# Create configuration file /etc/uwsgi/"$APPNAME".ini
-echo "Creating uwsgi configuration file /etc/uwsgi/apps-available/$APPNAME.ini"
+
+logged "[+]Creating uwsgi configuration file /etc/uwsgi/apps-available/$APPNAME.ini"
+####### Create configuration file /etc/uwsgi/"$APPNAME".ini
 echo "[uwsgi]
 
 socket = /tmp/$APPNAME.socket
@@ -202,6 +219,7 @@ enable-threads = true
 ln -s /etc/uwsgi/apps-available/"$APPNAME".ini /etc/uwsgi/apps-enabled/
 
 
+logged "[+]Downloading and installing Web2py"
 # Install Web2py
 mkdir /home/www-data
 cd /home/www-data
@@ -216,8 +234,8 @@ sudo -u www-data python -c "from gluon.main import save_password; save_password(
 # Needed on new versions of web2py where new folders where added
 ln -s handlers/wsgihandler.py .
 
+logged "[+]"Creating app\'s remove\(rm\) script at /home/www-data/"$APPNAME"/"$APPNAME"_remove_app.sh
 #Create app remove(rm) script
-echo Creating app remove\(rm\) script at /home/www-data/"$APPNAME"/"$APPNAME"_remove_app.sh
 echo "
 #!/bin/bash
 rm -rf /etc/uwsgi/apps-available/"$APPNAME".ini /tmp/$APPNAME* /home/www-data/$APPNAME
@@ -227,20 +245,21 @@ systemctl restart nginx.service
 systemctl reload uwsgi.service
 " > /home/www-data/"$APPNAME"/"$APPNAME"_remove_app.sh && chmod +x /home/www-data/"$APPNAME"/"$APPNAME"_remove_app.sh
 
+
+logged '[+](Re)Starting services'
 #(Re)Start services
-echo '(Re)Starting services'
 systemctl restart nginx.service
 systemctl restart uwsgi.service
 echo 'Done! Enjoy your app!'
 echo
 
-
-
-echo '
+echo -e '
 **** you can reload uwsgi with
-# systemctl reload uwsgi.service
+sudo systemctl reload uwsgi.service
 **** and stop it with
-# systemctl stop uwsgi.service
+sudo systemctl stop uwsgi.service
 **** to reload web2py only (without restarting uwsgi)
-# touch --no-dereference /etc/uwsgi/"$APPNAME".ini
+sudo touch --no-dereference /etc/uwsgi/"$APPNAME".ini
 '
+logged 'Finished SETUP'
+echo '=====================================================' | tee -a "$LOG_FILE"
